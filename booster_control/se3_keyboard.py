@@ -10,6 +10,7 @@ from collections.abc import Callable
 import glfw
 from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
 import threading
+import mujoco
 
 try:
     from pynput import keyboard as pynput_keyboard
@@ -224,7 +225,7 @@ class Se3Keyboard_Pynput(Se3Keyboard):
 
     def __init__(
         self,
-        renderer: MujocoRenderer,
+        renderer,
         pos_sensitivity: float,
         rot_sensitivity: float,
     ):
@@ -232,6 +233,8 @@ class Se3Keyboard_Pynput(Se3Keyboard):
             raise ImportError(
                 "pynput is required for Se3Keyboard_Pynput. Please install it with 'pip install pynput'."
             )
+
+        self.renderer = renderer
 
         self._delta_vel = np.zeros(3)
         self.rot_sensitivity = rot_sensitivity
@@ -246,9 +249,11 @@ class Se3Keyboard_Pynput(Se3Keyboard):
         Se3Keyboard._create_key_bindings(self)
 
         self._listener = pynput_keyboard.Listener(
-            on_press=self._on_press, on_release=self._on_release, suppress=True
+            on_press=self._on_press, on_release=self._on_release, suppress=False
         )
         self._listener.start()
+
+        self.viewer = self.renderer._get_viewer("human")
 
     def __del__(self):
         try:
@@ -321,4 +326,12 @@ class Se3Keyboard_Pynput(Se3Keyboard):
                         p_additional()
                     except Exception:
                         pass
+        self.reset_viewer_viz()
         return super().advance()
+
+    def reset_viewer_viz(self):
+        with self._lock:
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_WIREFRAME] = 0
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 1
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_ADDITIVE] = 0
+            self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_STATIC] = 1
