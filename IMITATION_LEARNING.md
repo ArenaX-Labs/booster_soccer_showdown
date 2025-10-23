@@ -41,10 +41,10 @@ python imitation_learning/train.py \
 Supported agents:
 
 * `bc` — Behavioral Cloning
-* `gbc` — Goal-Conditioned BC
 * `iql` — Implicit Q-Learning
-* `hiql` — Hierarchical Imitation Q-Learning
-* `gqicl` — Goal-Conditioned IQL
+* `gbc` — Goal-Conditioned BC - experimental
+* `hiql` — Hierarchical Imitation Q-Learning - experimental
+* `gqicl` — Goal-Conditioned IQL - experimental
 
 The checkpoints are saved in the `./exp` folder by default.
 
