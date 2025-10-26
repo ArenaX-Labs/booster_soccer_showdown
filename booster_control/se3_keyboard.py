@@ -261,6 +261,7 @@ class Se3Keyboard_Pynput(Se3Keyboard):
         self._lock = threading.Lock()
         self._pending_reset = False
         self._pending_p_additional: Callable | None = None
+        self._should_quit = False
 
         Se3Keyboard._create_key_bindings(self)
 

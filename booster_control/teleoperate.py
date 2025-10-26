@@ -13,12 +13,13 @@ def teleop(
     env_name: str = "LowerT1GoaliePenaltyKick-v0",
     pos_sensitivity: float = 0.1,
     rot_sensitivity: float = 1.5,
+    renderer="mjviewer"
 ):
-    env = gym.make(env_name, render_mode="human", renderer="mjviewer")
+    env = gym.make(env_name, render_mode="human", renderer=renderer)
     lower_t1_robot = LowerT1JoyStick(env.unwrapped)
 
     # Initialize the T1 SE3 keyboard controller with the viewer
-    if env.unwrapped.renderer == "mjviewer":
+    if renderer == "mjviewer":
         keyboard_controller = Se3Keyboard_Pynput(
             renderer=env.unwrapped.mujoco_renderer,
             pos_sensitivity=pos_sensitivity,
@@ -74,7 +75,8 @@ if __name__ == "__main__":
     parser.add_argument("--env", type=str, default="LowerT1GoaliePenaltyKick-v0", help="The environment to teleoperate.")
     parser.add_argument("--pos_sensitivity", type=float, default=0.1, help="SE3 Keyboard position sensitivity.")
     parser.add_argument("--rot_sensitivity", type=float, default=0.5, help="SE3 Keyboard rotation sensitivity.")
+    parser.add_argument("--renderer", type=str, default="mujoco", help="Which renderer to use.")
 
     args = parser.parse_args()
 
-    teleop(args.env, args.pos_sensitivity, args.rot_sensitivity)
+    teleop(args.env, args.pos_sensitivity, args.rot_sensitivity, args.renderer)
