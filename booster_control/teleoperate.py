@@ -50,8 +50,13 @@ def teleop(
         # Episode loop
         while not (terminated or truncated):
             # Get keyboard input and apply it directly to the environment
+            if keyboard_controller.should_quit():
+                print("\n[INFO] ESC pressed — exiting teleop.")
+                env.close()
+                return
+            
             command = keyboard_controller.advance()
-            ctrl = lower_t1_robot.get_actions(command, observation, info)
+            ctrl, _ = lower_t1_robot.get_actions(command, observation, info)
             observation, reward, terminated, truncated, info = env.step(ctrl)
 
             if terminated or truncated:
@@ -66,24 +71,9 @@ def teleop(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Teleoperate T1 robot in a gymnasium environment.")
-    parser.add_argument(
-        "--env",
-        type=str,
-        default="LowerT1GoaliePenaltyKick-v0",
-        help="The environment to teleoperate.",
-    )
-    parser.add_argument(
-        "--pos_sensitivity",
-        type=float,
-        default=0.5,
-        help="SE3 Keyboard position sensitivity.",
-    )
-    parser.add_argument(
-        "--rot_sensitivity",
-        type=float,
-        default=0.5,
-        help="SE3 Keyboard rotation sensitivity.",
-    )
+    parser.add_argument("--env", type=str, default="LowerT1GoaliePenaltyKick-v0", help="The environment to teleoperate.")
+    parser.add_argument("--pos_sensitivity", type=float, default=0.1, help="SE3 Keyboard position sensitivity.")
+    parser.add_argument("--rot_sensitivity", type=float, default=0.5, help="SE3 Keyboard rotation sensitivity.")
 
     args = parser.parse_args()
 

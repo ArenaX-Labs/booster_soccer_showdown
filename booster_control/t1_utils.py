@@ -233,4 +233,32 @@ class LowerT1JoyStick:
         self.it += 1
         self.gait_process = np.fmod(self.gait_process + self.cfg["sim"]["dt"] * self.gait_frequency, 1.0)
 
+        return ctrl, self.actions.copy()
+    
+    def get_torque(self, observation, actions):
+        """
+        Generates joint control signals based on the current observation
+        and the policy model.
+
+        Args:
+            command (tuple/list): Desired (lin_vel_x, lin_vel_y, ang_vel_yaw).  
+            obs (np.array): Current observation from the environment
+            info (dict): Information dict from the environment
+
+        Returns:
+            np.ndarray: Control signals for the actuators.
+        """
+        
+        _, mj_model = self.get_env_data_model(self.env)
+        dof_pos = observation[:12]
+        dof_vel = observation[12:24]
+
+        dof_targets = self.default_dof_pos + self.cfg["control"]["action_scale"] * actions
+        
+        ctrl = np.clip(
+            self.dof_stiffness * (dof_targets - dof_pos) - self.dof_damping * dof_vel,
+            mj_model.actuator_ctrlrange[self.diff:, 0],
+            mj_model.actuator_ctrlrange[self.diff:, 1],
+        )
+
         return ctrl

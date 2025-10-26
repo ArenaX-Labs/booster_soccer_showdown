@@ -53,6 +53,7 @@ class Se3Keyboard:
 
         self.rot_sensitivity = rot_sensitivity
         self.pos_sensitivity = pos_sensitivity
+        self._should_quit = False
 
         # dictionary for additional callbacks
         self._additional_callbacks = dict()
@@ -95,6 +96,7 @@ class Se3Keyboard:
         msg += "\tMove T1 along y-axis: A/D\n"
         msg += "\tRotate T1 along z-axis: Q/E\n"
         msg += "\tReset commands: L\n"
+        msg += "\tQuit: ESC\n"      
         msg += "\tReset environment: P"
         return msg
 
@@ -102,10 +104,15 @@ class Se3Keyboard:
     Operations
     """
 
+    def should_quit(self) -> bool:
+        """Return True if ESC was pressed."""
+        return self._should_quit
+
     def reset(self):
         """Reset all command buffers to default values."""
         # default flags
         self._delta_vel = np.zeros(3)  # (x, y, yaw)
+        self._should_quit = False
 
     def advance(self) -> np.ndarray:
         """Provides the result from keyboard event state.
@@ -151,6 +158,15 @@ class Se3Keyboard:
     def _on_keyboard_event(self, window, key, scancode, action, mods):
         """GLFW keyboard callback function."""
         # Convert GLFW key to character
+        if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
+            self._should_quit = True
+            # Optionally also request the window to close:
+            try:
+                glfw.set_window_should_close(window, True)
+            except Exception:
+                pass
+            return
+
         try:
             # Map arrow keys directly using a dictionary
             arrow_keys = {
