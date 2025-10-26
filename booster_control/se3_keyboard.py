@@ -7,9 +7,15 @@
 
 import numpy as np
 from collections.abc import Callable
-from scipy.spatial.transform import Rotation
 import glfw
 from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
+import threading
+import mujoco
+
+try:
+    from pynput import keyboard as pynput_keyboard
+except Exception:
+    pynput_keyboard = None
 
 
 class Se3Keyboard:
@@ -35,15 +41,15 @@ class Se3Keyboard:
         ============================== ================= =================
     """
 
-    def __init__(self, renderer: MujocoRenderer, pos_sensitivity = 0.1, rot_sensitivity = 0.5):
+    def __init__(self, renderer: MujocoRenderer, pos_sensitivity, rot_sensitivity):
         """Initialize the keyboard layer.
 
         Args:
             env: The Mujoco environment
-            pos_sensitivity: Magnitude of input position command scaling. Defaults to 0.4.
-            rot_sensitivity: Magnitude of scale input rotation commands scaling. Defaults to 0.8.
+            pos_sensitivity: Magnitude of input position command scaling.
+            rot_sensitivity: Magnitude of scale input rotation commands scaling.
         """
-        self._delta_vel =  np.zeros(3) # (x, y, yaw)
+        self._delta_vel = np.zeros(3)  # (x, y, yaw)
 
         self.rot_sensitivity = rot_sensitivity
         self.pos_sensitivity = pos_sensitivity
@@ -115,7 +121,7 @@ class Se3Keyboard:
             A 3-element array containing:
             - Elements 0-1: delta position [x, y]
             - Elements 2: delta rotation [yaw]
-         """
+        """
         # return the command and gripper state
         return self._delta_vel
 
@@ -228,3 +234,120 @@ class Se3Keyboard:
             "L": self.reset,
             "P": self._reset_env_callback,
         }
+
+
+class Se3Keyboard_Pynput(Se3Keyboard):
+    """Keyboard controller using pynput listener with the same API as Se3Keyboard."""
+
+    def __init__(
+        self,
+        renderer,
+        pos_sensitivity: float,
+        rot_sensitivity: float,
+    ):
+        if pynput_keyboard is None:
+            raise ImportError(
+                "pynput is required for Se3Keyboard_Pynput. Please install it with 'pip install pynput'."
+            )
+
+        self.renderer = renderer
+
+        self._delta_vel = np.zeros(3)
+        self.rot_sensitivity = rot_sensitivity
+        self.pos_sensitivity = pos_sensitivity
+        self._additional_callbacks: dict[str, Callable] = dict()
+        self._pressed_keys: set[str] = set()
+        self._reset_env_callback: Callable | None = None
+        self._lock = threading.Lock()
+        self._pending_reset = False
+        self._pending_p_additional: Callable | None = None
+
+        Se3Keyboard._create_key_bindings(self)
+
+        self._listener = pynput_keyboard.Listener(
+            on_press=self._on_press, on_release=self._on_release, suppress=False
+        )
+        self._listener.start()
+
+        self.viewer = self.renderer._get_viewer("human")
+
+    def __del__(self):
+        try:
+            if hasattr(self, "_listener") and self._listener is not None:
+                self._listener.stop()
+        except Exception:
+            pass
+
+    def set_reset_env_callback(self, callback: Callable):
+        self._reset_env_callback = callback
+        Se3Keyboard._create_key_bindings(self)
+
+    def _key_to_char(self, key) -> str | None:
+        try:
+            if isinstance(key, pynput_keyboard.KeyCode) and key.char:
+                return key.char.upper()
+        except Exception:
+            return None
+        return None
+
+    def _on_press(self, key):
+        key_char = self._key_to_char(key)
+        if not key_char:
+            return
+        if key_char == "P":
+            with self._lock:
+                if key_char not in self._pressed_keys:
+                    self._pressed_keys.add(key_char)
+                    self._pending_reset = True
+                    self._pending_p_additional = self._additional_callbacks.get("P")
+            return
+
+        if key_char in self._INPUT_KEY_MAPPING or key_char == "L":
+            with self._lock:
+                if key_char not in self._pressed_keys:
+                    self._pressed_keys.add(key_char)
+                    self._handle_key_press(key_char)
+
+    def _on_release(self, key):
+        key_char = self._key_to_char(key)
+        if not key_char:
+            return
+        if key_char in ["W", "S", "A", "D", "Q", "E"]:
+            with self._lock:
+                if key_char in self._pressed_keys:
+                    self._pressed_keys.discard(key_char)
+                    self._handle_key_release(key_char)
+        elif key_char == "P":
+            with self._lock:
+                self._pressed_keys.discard(key_char)
+
+    def advance(self) -> np.ndarray:
+        do_reset = False
+        reset_cb: Callable | None = None
+        p_additional: Callable | None = None
+        with self._lock:
+            if self._pending_reset:
+                self._pending_reset = False
+                do_reset = True
+                reset_cb = self._reset_env_callback
+                p_additional = self._pending_p_additional
+                self._pending_p_additional = None
+        if do_reset:
+            try:
+                if reset_cb is not None:
+                    reset_cb()
+            finally:
+                if p_additional is not None:
+                    try:
+                        p_additional()
+                    except Exception:
+                        pass
+        self.reset_viewer_viz()
+        return super().advance()
+
+    def reset_viewer_viz(self):
+        with self._lock:
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_WIREFRAME] = 0
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 1
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_ADDITIVE] = 0
+            self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_STATIC] = 1

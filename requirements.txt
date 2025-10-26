@@ -5,6 +5,7 @@ imageio
 huggingface_hub
 hf_xet
 stable-baselines3
+pynput
 wandb
 tqdm
 numpy==2.1.3
