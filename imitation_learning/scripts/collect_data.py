@@ -17,6 +17,17 @@ from booster_control.se3_keyboard import Se3Keyboard
 from booster_control.t1_utils import LowerT1JoyStick
 from imitation_learning.scripts.preprocessor import Preprocessor
 
+def get_task_one_hot(env_name):
+
+    if "GoaliePenaltyKick" in env_name:
+        task_one_hot = np.array([1.0, 0.0, 0.0])
+    elif "ObstaclePenaltyKick" in env_name:
+        task_one_hot = np.array([0.0, 1.0, 0.0])
+    elif "KickToTarget" in env_name:
+        task_one_hot = np.array([0.0, 0.0, 1.0])
+
+    return task_one_hot
+
 def teleop(env_name: str = "LowerT1GoaliePenaltyKick-v0", pos_sensitivity:float = 0.1, rot_sensitivity:float = 1.5, dataset_directory = "./data.npz"):
 
     env = gym.make(env_name, render_mode="human")
@@ -35,11 +46,13 @@ def teleop(env_name: str = "LowerT1GoaliePenaltyKick-v0", pos_sensitivity:float 
 
     dataset = {
         "observations" : [],
-        "actions" : []
+        "actions" : [],
+        "done": []
     }
 
     # Main teleoperation loop
     episode_count = 0
+    task_one_hot = get_task_one_hot(env_name)
     while True:
         # Reset environment for new episode
         terminated = truncated = False
@@ -48,18 +61,19 @@ def teleop(env_name: str = "LowerT1GoaliePenaltyKick-v0", pos_sensitivity:float 
 
         episode = {
             "observations" : [],
-            "actions" : []
+            "actions" : [],
+            "done": []
         }
 
         print(f"\nStarting episode {episode_count}")
         # Episode loop  
         while not (terminated or truncated):
 
-            preprocessed_observation = preprocessor.modify_state(observation.copy(), info.copy())
+            preprocessed_observation = preprocessor.modify_state(observation.copy(), info.copy(), task_one_hot)
             # Get keyboard input and apply it directly to the environment
             if keyboard_controller.should_quit():
                 print("\n[INFO] ESC pressed — exiting teleop.")
-                np.savez(dataset_directory, observations=dataset["observations"], actions=dataset["actions"])
+                np.savez(dataset_directory, observations=dataset["observations"], actions=dataset["actions"], done = dataset["done"])
                 env.close()
                 return
             
@@ -68,14 +82,17 @@ def teleop(env_name: str = "LowerT1GoaliePenaltyKick-v0", pos_sensitivity:float 
 
             episode["observations"].append(preprocessed_observation)
             episode["actions"].append(actions)
-
+            
             observation, reward, terminated, truncated, info = env.step(ctrl)
+            episode["done"].append(terminated)
 
             if terminated or truncated:
                 break
         
         dataset["observations"].extend(episode["observations"])
         dataset["actions"].extend(episode["actions"])
+        dataset["done"].extend(episode["done"])
+
         # Print episode result
         if info.get("success", True):
             print(f"Episode {episode_count} completed successfully!")
@@ -89,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument("--env", type=str, default="LowerT1GoaliePenaltyKick-v0", help="The environment to teleoperate.")
     parser.add_argument("--pos_sensitivity", type=float, default=0.1, help="SE3 Keyboard position sensitivity.")
     parser.add_argument("--rot_sensitivity", type=float, default=0.5, help="SE3 Keyboard rotation sensitivity.")
-    parser.add_argument("--data_set_directory", type=str, default="./data/data2.npz", help="SE3 Keyboard rotation sensitivity.")
+    parser.add_argument("--data_set_directory", type=str, default="./data/dataset_kick.npz", help="SE3 Keyboard rotation sensitivity.")
 
     args = parser.parse_args()
 
