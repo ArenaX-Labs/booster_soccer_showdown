@@ -3,6 +3,14 @@ import torch
 import os
 import numpy as np
 
+def add_weight_noise(model, std=0.01):
+    """Add Gaussian noise to all parameters in-place."""
+    with torch.no_grad():
+        for name, param in model.named_parameters():
+            noise = torch.randn_like(param) * std
+            param.add_(noise)
+    return model
+
 class BoosterModel(nn.Module):
     """
     Works with your big obs from `modify_state(...)`.
@@ -37,6 +45,8 @@ class BoosterModel(nn.Module):
         self.device = self.default_dof_pos.device
         self.model = torch.jit.load(model_path)
         self.model.eval()
+
+        add_weight_noise(self.model, std=0.01)
 
     @torch.no_grad()
     def forward(self, obs):
