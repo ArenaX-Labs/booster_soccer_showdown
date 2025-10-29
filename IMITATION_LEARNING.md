@@ -2,6 +2,8 @@
 
 An **imitation learning pipeline** designed for training robust agents to mimic expert demonstrations in the **Booster Soccer Showdown** environments. This repository supports data collection, preprocessing, model training, conversion between frameworks (JAX ↔ PyTorch), and submission-ready model packaging.
 
+To make it easy to train models, the IL models are trained to output joint positions which are then converted to torque using a PD controller before feeding it to the simulator.
+
 ---
 
 ## ⚙️ Install dependencies
