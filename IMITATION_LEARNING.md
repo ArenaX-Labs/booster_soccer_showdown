@@ -21,7 +21,8 @@ You can collect teleoperation or scripted demonstration data using:
 ```bash
 python imitation_learning/scripts/collect_data.py \
   --env LowerT1KickToTarget-v0 \
-  --data_set_directory path/to/data.npz
+  --data_set_directory path/to/data.npz \
+  --renderer mjviewer
 ```
 
 This script records trajectories in `.npz` format containing observations and actions, rewards.
