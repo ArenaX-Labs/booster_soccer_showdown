@@ -19,6 +19,17 @@ from utils.flax_utils import restore_agent
 from booster_control.t1_utils import LowerT1JoyStick
 from imitation_learning.scripts.preprocessor import Preprocessor
 
+def get_task_one_hot(env_name):
+
+    if "GoaliePenaltyKick" in env_name:
+        task_one_hot = np.array([1.0, 0.0, 0.0])
+    elif "ObstaclePenaltyKick" in env_name:
+        task_one_hot = np.array([0.0, 1.0, 0.0])
+    elif "KickToTarget" in env_name:
+        task_one_hot = np.array([0.0, 0.0, 1.0])
+
+    return task_one_hot
+
 def main(args):
 
     random.seed(args.seed)
@@ -51,11 +62,11 @@ def main(args):
     env = gym.make(args.env_name, render_mode="human")
     lower_t1_robot = LowerT1JoyStick(env.unwrapped)
     preprocessor = Preprocessor()
-
+    task_one_hot = get_task_one_hot(args.env_name)
     observation, info = env.reset()
     i = 0
     while True:
-        preprocessed_observation = preprocessor.modify_state(observation.copy(), info.copy())
+        preprocessed_observation = preprocessor.modify_state(observation.copy(), info.copy(), task_one_hot)
         action = agent(observation=preprocessed_observation, temperature=0.0)
         action = np.array(action)
         i += 1

@@ -263,7 +263,7 @@ class Se3Keyboard_Pynput(Se3Keyboard):
         self._pending_p_additional: Callable | None = None
         self._should_quit = False
 
-        Se3Keyboard._create_key_bindings(self)
+        self._create_key_bindings()
 
         self._listener = pynput_keyboard.Listener(
             on_press=self._on_press, on_release=self._on_release, suppress=False
@@ -271,6 +271,43 @@ class Se3Keyboard_Pynput(Se3Keyboard):
         self._listener.start()
 
         self.viewer = self.renderer._get_viewer("human")
+
+    def _handle_key_press(self, key_char):
+        """Handle key press events."""
+        # Apply the command when pressed
+        if key_char == "L":
+            self.reset()
+        elif key_char == "P" and self._reset_env_callback:
+            self._reset_env_callback()
+        elif key_char in ["V", "B", "N", "M", ".", ","]:
+            self._delta_vel += self._INPUT_KEY_MAPPING[key_char]
+
+        # Additional callbacks
+        if key_char in self._additional_callbacks:
+            self._additional_callbacks[key_char]()
+
+    def _handle_key_release(self, key_char):
+        """Handle key release events."""
+        # Remove the command when un-pressed
+        if key_char in ["V", "B", "N", "M", ".", ","]:
+            self._delta_vel -= self._INPUT_KEY_MAPPING[key_char]
+
+    def _create_key_bindings(self):
+        """Creates default key binding."""
+        self._INPUT_KEY_MAPPING = {
+            # x-axis (forward)
+            "V": np.asarray([1.0, 0.0, 0.0]) * self.pos_sensitivity,
+            "B": np.asarray([-1.0, 0.0, 0.0]) * self.pos_sensitivity,
+            # y-axis (left-right)
+            "N": np.asarray([0.0, 1.0, 0.0]) * self.pos_sensitivity,
+            "M": np.asarray([0.0, -1.0, 0.0]) * self.pos_sensitivity,
+            # z-axis (rotation)
+            ".": np.asarray([0.0, 0.0, 1.0]) * self.rot_sensitivity,
+            ",": np.asarray([0.0, 0.0, -1.0]) * self.rot_sensitivity,
+            # reset commands
+            "L": self.reset,
+            "P": self._reset_env_callback,
+        }
 
     def __del__(self):
         try:
@@ -281,7 +318,7 @@ class Se3Keyboard_Pynput(Se3Keyboard):
 
     def set_reset_env_callback(self, callback: Callable):
         self._reset_env_callback = callback
-        Se3Keyboard._create_key_bindings(self)
+        self._create_key_bindings()
 
     def _key_to_char(self, key) -> str | None:
         try:
@@ -313,7 +350,7 @@ class Se3Keyboard_Pynput(Se3Keyboard):
         key_char = self._key_to_char(key)
         if not key_char:
             return
-        if key_char in ["W", "S", "A", "D", "Q", "E"]:
+        if key_char in ["V", "B", "N", "M", ".", ","]:
             with self._lock:
                 if key_char in self._pressed_keys:
                     self._pressed_keys.discard(key_char)
@@ -343,12 +380,17 @@ class Se3Keyboard_Pynput(Se3Keyboard):
                         p_additional()
                     except Exception:
                         pass
-        self.reset_viewer_viz()
         return super().advance()
+    
+    def __str__(self) -> str:
+        """Returns: A string containing the information of keyboard controller."""
+        msg = f"Keyboard Controller for SE(3): {self.__class__.__name__}\n"
+        msg += "\t----------------------------------------------\n"
+        msg += "\tMove T1 along x-axis: V/B\n"
+        msg += "\tMove T1 along y-axis: N/M\n"
+        msg += "\tRotate T1 along z-axis: ./,\n"
+        msg += "\tReset commands: L\n"
+        msg += "\tQuit: ESC\n"      
+        msg += "\tReset environment: P"
+        return msg
 
-    def reset_viewer_viz(self):
-        with self._lock:
-            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_WIREFRAME] = 0
-            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 1
-            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_ADDITIVE] = 0
-            self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_STATIC] = 1

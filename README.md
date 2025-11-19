@@ -52,6 +52,7 @@ Booster Soccer Showdown supports keyboard teleop out of the box.
 ```bash
 python booster_control/teleoperate.py \
   --env LowerT1GoaliePenaltyKick-v0 
+  --renderer mujoco
 ```
 
 **Default bindings (example):**
@@ -77,6 +78,13 @@ python booster_control/teleoperate.py \
 
 (Tune `--pos_sensitivity` and `--rot_sensitivity` as needed for your setup.)
 
+There is another renderer as well which can be used, which speeds up the simulation - 
+
+```bash
+python booster_control/teleoperate.py \
+  --env LowerT1GoaliePenaltyKick-v0 \
+  --renderer mjviewer
+```
 ---
 
 ## Mimic
